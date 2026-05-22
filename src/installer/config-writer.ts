@@ -12,13 +12,13 @@
  */
 
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import {
   writeMcpEntry,
   writePermissionsEntry,
   writeInstructionsEntry,
   userClaudeDir,
+  userClaudeMcpJsonPath,
 } from './targets/claude';
 import { readJsonFile } from './targets/shared';
 
@@ -48,15 +48,10 @@ export function writeClaudeMd(location: InstallLocation): { created: boolean; up
 
 export function hasMcpConfig(location: InstallLocation): boolean {
   // local scope lives in ./.mcp.json (project scope); global is the
-  // user-scope .claude.json — at $HOME/.claude.json by default, or
-  // INSIDE $CLAUDE_CONFIG_DIR when set. Mirrors `mcpJsonPath` in
-  // targets/claude.ts.
-  const env = process.env.CLAUDE_CONFIG_DIR;
-  const globalMcp = env && env.trim().length > 0
-    ? path.join(path.resolve(env), '.claude.json')
-    : path.join(os.homedir(), '.claude.json');
+  // user-scope .claude.json (env-aware, resolved through the Claude
+  // target so this shim can't drift from the writer).
   const file = location === 'global'
-    ? globalMcp
+    ? userClaudeMcpJsonPath()
     : path.join(process.cwd(), '.mcp.json');
   const config = readJsonFile(file);
   return !!config.mcpServers?.codegraph;

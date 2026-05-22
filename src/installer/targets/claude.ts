@@ -69,18 +69,25 @@ function configDir(loc: Location): string {
     ? userClaudeDir()
     : path.join(process.cwd(), '.claude');
 }
+/**
+ * Path to the user-scope `.claude.json` MCP file. Default layout puts
+ * it at `$HOME/.claude.json` (SIBLING of `$HOME/.claude/`, not inside);
+ * with `$CLAUDE_CONFIG_DIR` set, it moves INSIDE that dir so each
+ * account has an isolated MCP server list. Exported so the legacy
+ * `config-writer.ts` shim resolves it through the same single source
+ * of truth — divergence here would silently break multi-account.
+ */
+export function userClaudeMcpJsonPath(): string {
+  return process.env.CLAUDE_CONFIG_DIR && process.env.CLAUDE_CONFIG_DIR.trim().length > 0
+    ? path.join(userClaudeDir(), '.claude.json')
+    : path.join(os.homedir(), '.claude.json');
+}
 function mcpJsonPath(loc: Location): string {
   // local → ./.mcp.json (project scope: the ONLY project-level MCP
   // file Claude Code reads — NOT ./.claude.json, which it ignores).
-  if (loc !== 'global') return path.join(process.cwd(), '.mcp.json');
-  // global, default layout → `$HOME/.claude.json` lives as a SIBLING
-  // of `$HOME/.claude/`, not inside it. With `$CLAUDE_CONFIG_DIR` set
-  // (multi-account), Claude Code moves the user-scope MCP file inside
-  // that dir, so the two accounts have isolated MCP server lists.
-  const env = process.env.CLAUDE_CONFIG_DIR;
-  return env && env.trim().length > 0
-    ? path.join(path.resolve(env), '.claude.json')
-    : path.join(os.homedir(), '.claude.json');
+  return loc === 'global'
+    ? userClaudeMcpJsonPath()
+    : path.join(process.cwd(), '.mcp.json');
 }
 /**
  * Where pre-#207 installers wrote the local MCP entry. Claude Code
