@@ -27,6 +27,8 @@ import { getGlyphs } from '../ui/glyphs';
 // re-exports FileWatcher and would transitively pull in ../extraction — the
 // installer must stay importable even when native modules can't load).
 import { watchDisabledReason } from '../sync/watch-policy';
+import { ensureConfig } from '../usage/config';
+import { usageLogPath } from '../usage/paths';
 import { isGitRepo, isSyncHookInstalled, installGitSyncHook } from '../sync/git-hooks';
 
 // Backwards-compat: keep these named exports — downstream code may
@@ -210,6 +212,13 @@ export async function runInstallerWithOptions(opts: RunInstallerOptions): Promis
   if (location === 'global') {
     clack.note('cd your-project\ncodegraph init -i', 'Quick start');
   }
+
+  const usageCfg = ensureConfig();
+  const trackingState = usageCfg.usage.enabled ? 'enabled' : 'disabled';
+  clack.log.success(
+    `Usage tracking ${trackingState} — ${usageLogPath()}\n` +
+    `  (manage with 'codegraph usage' or env CODEGRAPH_USAGE=0)`,
+  );
 
   const finalNote = targets.length > 0
     ? `Done! Restart your agent${targets.length > 1 ? 's' : ''} to use CodeGraph.`
