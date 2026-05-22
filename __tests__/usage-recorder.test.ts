@@ -101,6 +101,7 @@ describe('UsageRecorder', () => {
     const rec = new UsageRecorder({ enabled: true, mode: 'minimal', source: 'config' });
     let resolveWrite: (() => void) | null = null;
     const writePromise = new Promise<void>((r) => { resolveWrite = r; });
+    const mkdirSpy = vi.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined);
     const spy = vi.spyOn(fs.promises, 'appendFile').mockReturnValue(writePromise as Promise<void>);
     const wrapped = rec.wrap(async () => okResult);
 
@@ -110,6 +111,7 @@ describe('UsageRecorder', () => {
 
     resolveWrite!();
     await rec.flush();
+    mkdirSpy.mockRestore();
     spy.mockRestore();
   });
 

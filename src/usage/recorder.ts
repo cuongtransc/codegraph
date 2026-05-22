@@ -21,7 +21,7 @@ interface UsageRow {
 }
 
 export class UsageRecorder {
-  private pending: Promise<void>[] = [];
+  private pending: Set<Promise<void>> = new Set();
   private warnedOnce = false;
 
   constructor(
@@ -45,7 +45,8 @@ export class UsageRecorder {
       try {
         const row = this.buildRow(toolName, args, result, startTime);
         const p = this.scheduleWrite(row);
-        this.pending.push(p);
+        this.pending.add(p);
+        p.finally(() => { this.pending.delete(p); });
       } catch {
         // Recorder bug must never break a tool call.
       }
@@ -55,7 +56,8 @@ export class UsageRecorder {
 
   /** Wait for all queued background writes to complete. Used by tests and graceful shutdown. */
   async flush(): Promise<void> {
-    const inFlight = this.pending.splice(0);
+    // Snapshot current in-flight writes; any added after this point are caller's problem.
+    const inFlight = [...this.pending];
     await Promise.allSettled(inFlight);
   }
 
