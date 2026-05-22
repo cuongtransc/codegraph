@@ -38,12 +38,17 @@ function setHome(dir: string): { restore: () => void } {
     APPDATA: process.env.APPDATA,
     XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
     HERMES_HOME: process.env.HERMES_HOME,
+    CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
   };
   process.env.HOME = dir;
   process.env.USERPROFILE = dir;
   process.env.APPDATA = path.join(dir, '.config');
   process.env.XDG_CONFIG_HOME = path.join(dir, '.config');
   delete process.env.HERMES_HOME;
+  // Tests assume the default ~/.claude layout unless they opt-in.
+  // The user's shell may export CLAUDE_CONFIG_DIR (multi-account setup);
+  // clear it so the baseline contract tests resolve to $HOME/.claude.
+  delete process.env.CLAUDE_CONFIG_DIR;
   return {
     restore() {
       if (prev.HOME === undefined) delete process.env.HOME; else process.env.HOME = prev.HOME;
@@ -51,6 +56,7 @@ function setHome(dir: string): { restore: () => void } {
       if (prev.APPDATA === undefined) delete process.env.APPDATA; else process.env.APPDATA = prev.APPDATA;
       if (prev.XDG_CONFIG_HOME === undefined) delete process.env.XDG_CONFIG_HOME; else process.env.XDG_CONFIG_HOME = prev.XDG_CONFIG_HOME;
       if (prev.HERMES_HOME === undefined) delete process.env.HERMES_HOME; else process.env.HERMES_HOME = prev.HERMES_HOME;
+      if (prev.CLAUDE_CONFIG_DIR === undefined) delete process.env.CLAUDE_CONFIG_DIR; else process.env.CLAUDE_CONFIG_DIR = prev.CLAUDE_CONFIG_DIR;
     },
   };
 }
@@ -430,6 +436,42 @@ describe('Installer targets — partial-state idempotency', () => {
     claude.install('global', { autoAllow: false });
     const cfg = JSON.parse(fs.readFileSync(path.join(tmpHome, '.claude.json'), 'utf-8'));
     expect(cfg.mcpServers.codegraph).toBeDefined();
+  });
+
+  it('claude: global install honors $CLAUDE_CONFIG_DIR for multi-account setups', () => {
+    // Second Claude account: user points CLAUDE_CONFIG_DIR at a sibling
+    // dir (mirrors what Claude Code itself does). All user-scope files
+    // — .claude.json, settings.json, CLAUDE.md — must land there, NOT
+    // in $HOME/.claude/, or the two accounts share MCP servers and
+    // permissions and the isolation is defeated.
+    const altDir = path.join(tmpHome, '.claude-work');
+    process.env.CLAUDE_CONFIG_DIR = altDir;
+
+    const claude = getTarget('claude')!;
+    const result = claude.install('global', { autoAllow: true });
+
+    // Nothing in the default ~/.claude location.
+    expect(fs.existsSync(path.join(tmpHome, '.claude.json'))).toBe(false);
+    expect(fs.existsSync(path.join(tmpHome, '.claude'))).toBe(false);
+
+    // Everything under $CLAUDE_CONFIG_DIR instead.
+    expect(fs.existsSync(path.join(altDir, '.claude.json'))).toBe(true);
+    expect(fs.existsSync(path.join(altDir, 'settings.json'))).toBe(true);
+    expect(fs.existsSync(path.join(altDir, 'CLAUDE.md'))).toBe(true);
+
+    // Every reported file path is rooted in altDir (paranoia check).
+    for (const file of result.files) {
+      if (file.action === 'not-found' || file.action === 'unchanged') continue;
+      expect(file.path.startsWith(altDir)).toBe(true);
+    }
+
+    // detect() must agree — otherwise re-install / uninstall on the
+    // second account would no-op against the wrong directory.
+    expect(claude.detect('global').alreadyConfigured).toBe(true);
+
+    // Round-trip: uninstall reverses install in the alt directory.
+    claude.uninstall('global');
+    expect(claude.detect('global').alreadyConfigured).toBe(false);
   });
 
   it('claude: local install migrates a legacy ./.claude.json codegraph entry into ./.mcp.json', () => {

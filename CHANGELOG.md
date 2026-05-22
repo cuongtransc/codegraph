@@ -44,6 +44,14 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.9.3] - 2026-05-22
 
 ### Added
+- **Multi-account Claude Code support via `$CLAUDE_CONFIG_DIR`.** `codegraph
+  install --target claude` now honors the same `$CLAUDE_CONFIG_DIR` env var
+  Claude Code itself reads, so a second account at e.g. `~/.claude-work` gets
+  its own isolated `settings.json`, `CLAUDE.md`, and `.claude.json` MCP server
+  list. Without the env var, files land in the default `~/.claude/` +
+  `~/.claude.json` layout exactly as before. Use
+  `CLAUDE_CONFIG_DIR=~/.claude-work codegraph install` to provision codegraph
+  against a second account without touching the first.
 - **`codegraph uninstall` command.** Cleanly removes CodeGraph from every agent
   it's configured on — Claude Code, Cursor, Codex CLI, opencode, and Hermes
   Agent — in one step. It asks up front whether to remove the global config
