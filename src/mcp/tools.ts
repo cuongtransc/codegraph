@@ -515,6 +515,11 @@ export class ToolHandler {
     this.defaultProjectHint = searchedPath;
   }
 
+  /** Exposed for instrumentation (usage recorder). Do not use for routing. */
+  getDefaultProjectHint(): string | undefined {
+    return this.defaultProjectHint ?? undefined;
+  }
+
   /**
    * Whether a default CodeGraph instance is available
    */

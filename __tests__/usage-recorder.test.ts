@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { UsageRecorder } from '../src/usage/recorder';
 import { usageLogPath } from '../src/usage/paths';
+import { ToolHandler } from '../src/mcp/tools';
 import type { ToolResult } from '../src/mcp/tools';
 
 function readRows(p: string): Record<string, unknown>[] {
@@ -137,5 +138,40 @@ describe('UsageRecorder', () => {
 
     const rows = readRows(usageLogPath());
     expect(rows[0].project).toBe('/hint/path');
+  });
+});
+
+describe('UsageRecorder × ToolHandler', () => {
+  let home: string;
+  let prevHome: string | undefined;
+
+  beforeEach(() => {
+    prevHome = process.env.CODEGRAPH_HOME;
+    home = fs.mkdtempSync(path.join(os.tmpdir(), 'cg-rec-int-'));
+    process.env.CODEGRAPH_HOME = home;
+  });
+
+  afterEach(() => {
+    fs.rmSync(home, { recursive: true, force: true });
+    if (prevHome === undefined) delete process.env.CODEGRAPH_HOME;
+    else process.env.CODEGRAPH_HOME = prevHome;
+  });
+
+  it('decorated execute returns identical result and records a row', async () => {
+    const handler = new ToolHandler(null);
+    const rec = new UsageRecorder(
+      { enabled: true, mode: 'minimal', source: 'config' },
+      { getDefaultProjectHint: () => handler.getDefaultProjectHint() },
+    );
+    const original = handler.execute.bind(handler);
+    const wrapped = rec.wrap(original);
+
+    // codegraph_status with no project loaded returns an error result, not throws
+    const result = await wrapped('codegraph_status', {});
+    expect(result).toHaveProperty('content');
+    await rec.flush();
+
+    const rows = fs.readFileSync(usageLogPath(), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    expect(rows[0].tool).toBe('codegraph_status');
   });
 });

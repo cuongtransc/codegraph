@@ -20,7 +20,10 @@ import CodeGraph, { findNearestCodeGraphRoot } from '../index';
 import { watchDisabledReason } from '../sync';
 import { StdioTransport, JsonRpcRequest, JsonRpcNotification, ErrorCodes } from './transport';
 import { tools, ToolHandler } from './tools';
+import type { ToolResult } from './tools';
 import { SERVER_INSTRUCTIONS } from './server-instructions';
+import { UsageRecorder } from '../usage/recorder';
+import { snapshotEffective } from '../usage/config';
 
 /**
  * Convert a file:// URI to a filesystem path.
@@ -84,6 +87,8 @@ export class MCPServer {
   private transport: StdioTransport;
   private cg: CodeGraph | null = null;
   private toolHandler: ToolHandler;
+  private usageRecorder: UsageRecorder;
+  private recordedExecute: (toolName: string, args: Record<string, unknown>) => Promise<ToolResult>;
   private projectPath: string | null;
   // In-flight background init kicked off from handleInitialize. Tracked so the
   // sync retry path doesn't race against it (double-opening the SQLite file).
@@ -101,6 +106,12 @@ export class MCPServer {
     this.transport = new StdioTransport();
     // Create ToolHandler eagerly — cross-project queries work even without a default project
     this.toolHandler = new ToolHandler(null);
+    this.usageRecorder = new UsageRecorder(snapshotEffective(), {
+      getDefaultProjectHint: () => this.toolHandler.getDefaultProjectHint(),
+    });
+    this.recordedExecute = this.usageRecorder.wrap(
+      this.toolHandler.execute.bind(this.toolHandler),
+    );
   }
 
   /**
@@ -282,7 +293,9 @@ export class MCPServer {
   /**
    * Stop the server
    */
-  stop(): void {
+  async stop(): Promise<void> {
+    // Flush any in-flight usage records before closing resources
+    await this.usageRecorder.flush();
     // Close all cached cross-project connections first
     this.toolHandler.closeAll();
     // Close the main CodeGraph instance
@@ -452,7 +465,7 @@ export class MCPServer {
     // initialized after the MCP server started (e.g. user ran codegraph init)
     await this.retryInitIfNeeded();
 
-    const result = await this.toolHandler.execute(toolName, toolArgs);
+    const result = await this.recordedExecute(toolName, toolArgs);
 
     this.transport.sendResult(request.id, result);
   }
