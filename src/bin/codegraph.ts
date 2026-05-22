@@ -1346,6 +1346,64 @@ program
   });
 
 /**
+ * codegraph gain — local usage analytics
+ */
+program
+  .command('gain')
+  .description('Show codegraph usage analytics from ~/.codegraph/usage.jsonl')
+  .option('--since <dur>', 'Restrict to last duration (e.g. 30m, 24h, 7d, 2w)', '30d')
+  .option('--tool <name>', 'Restrict to one tool name')
+  .option('--project <substr>', 'Restrict to project paths containing this substring')
+  .option('--project-exact <path>', 'Restrict to exact project path match')
+  .option('--json', 'Emit JSON instead of formatted table')
+  .action(async (opts: {
+    since?: string;
+    tool?: string;
+    project?: string;
+    projectExact?: string;
+    json?: boolean;
+  }) => {
+    const { aggregate, parseSince } = await import('../usage/aggregator');
+    const { snapshotEffective } = await import('../usage/config');
+    const { usageLogPath } = await import('../usage/paths');
+    const { renderGain } = await import('../usage/render');
+    const fs = await import('fs');
+
+    // Validate --since up front so we exit non-zero before any file I/O.
+    if (opts.since) {
+      try {
+        parseSince(opts.since);
+      } catch (e) {
+        process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`);
+        process.exit(1);
+      }
+    }
+
+    let rollup;
+    try {
+      rollup = aggregate({
+        since: opts.since,
+        tool: opts.tool,
+        project: opts.project,
+        projectExact: opts.projectExact,
+      });
+    } catch (e) {
+      process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`);
+      process.exit(1);
+    }
+
+    if (opts.json) {
+      process.stdout.write(JSON.stringify(rollup, null, 2) + '\n');
+      return;
+    }
+
+    const snap = snapshotEffective();
+    const logPath = usageLogPath();
+    const logSize = fs.existsSync(logPath) ? fs.statSync(logPath).size : 0;
+    process.stdout.write(renderGain(rollup, { snap, since: opts.since ?? '30d', logSize, logPath }));
+  });
+
+/**
  * codegraph install
  */
 program

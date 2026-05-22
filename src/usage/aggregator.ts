@@ -39,7 +39,7 @@ const SINCE_RE = /^([1-9]\d*)([mhdw])$/;
 export function parseSince(input: string): number {
   const m = SINCE_RE.exec(input);
   if (!m) throw new Error(`Invalid --since "${input}". Expected <int><m|h|d|w> (e.g. 30m, 24h, 7d, 2w).`);
-  const n = parseInt(m[1], 10);
+  const n = parseInt(m[1] as string, 10);
   switch (m[2]) {
     case 'm': return n * 60_000;
     case 'h': return n * 3600_000;
@@ -82,8 +82,8 @@ export function aggregate(opts: AggregateOptions): Rollup {
     totalCalls++;
     totalBytes += row.respBytes || 0;
     totalDur += row.durMs || 0;
-    windowStart = windowStart === null || row.ts < windowStart ? row.ts : windowStart;
-    windowEnd = windowEnd === null || row.ts > windowEnd ? row.ts : windowEnd;
+    if (windowStart === null || row.ts < windowStart) windowStart = row.ts;
+    if (windowEnd === null || row.ts > windowEnd) windowEnd = row.ts;
 
     const t = byTool.get(row.tool) ?? { tool: row.tool, calls: 0, bytes: 0 };
     t.calls++; t.bytes += row.respBytes || 0;
