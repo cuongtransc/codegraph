@@ -62,3 +62,49 @@ describe('codegraph gain', () => {
     expect(r.stderr).toMatch(/Invalid --since/);
   });
 });
+
+describe('codegraph usage', () => {
+  let home: string;
+
+  beforeEach(() => {
+    home = fs.mkdtempSync(path.join(os.tmpdir(), 'cg-cli-usage-'));
+    fs.mkdirSync(home, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(home, { recursive: true, force: true });
+  });
+
+  it('status prints current config and file size', () => {
+    const r = runCli(['usage', 'status'], { CODEGRAPH_HOME: home });
+    expect(r.code).toBe(0);
+    expect(r.stdout).toMatch(/Tracking:/);
+    expect(r.stdout).toMatch(/Mode:/);
+  });
+
+  it('enable then disable round-trip through config file', () => {
+    runCli(['usage', 'disable'], { CODEGRAPH_HOME: home });
+    expect(JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8')).usage.enabled).toBe(false);
+
+    runCli(['usage', 'enable'], { CODEGRAPH_HOME: home });
+    expect(JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8')).usage.enabled).toBe(true);
+  });
+
+  it('enable --verbose sets mode to verbose', () => {
+    runCli(['usage', 'enable', '--verbose'], { CODEGRAPH_HOME: home });
+    const cfg = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8'));
+    expect(cfg.usage.mode).toBe('verbose');
+  });
+
+  it('enable/disable output mentions restart-for-running-servers', () => {
+    const r = runCli(['usage', 'enable'], { CODEGRAPH_HOME: home });
+    expect(r.stdout).toMatch(/restart|new MCP/i);
+  });
+
+  it('clear truncates usage.jsonl with --yes', () => {
+    fs.writeFileSync(path.join(home, 'usage.jsonl'), '{"ts":"x","tool":"y","project":"z","durMs":1,"respBytes":1}\n');
+    const r = runCli(['usage', 'clear', '--yes'], { CODEGRAPH_HOME: home });
+    expect(r.code).toBe(0);
+    expect(fs.readFileSync(path.join(home, 'usage.jsonl'), 'utf8')).toBe('');
+  });
+});

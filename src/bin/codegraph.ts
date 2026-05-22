@@ -1404,6 +1404,80 @@ program
   });
 
 /**
+ * codegraph usage — manage local usage tracking
+ */
+const usageCmd = program
+  .command('usage')
+  .description('Manage codegraph local usage tracking (enable/disable/status/clear)');
+
+usageCmd
+  .command('status')
+  .description('Show usage tracking config and log file size')
+  .action(async () => {
+    const fs = await import('fs');
+    const { snapshotEffective } = await import('../usage/config');
+    const { usageLogPath } = await import('../usage/paths');
+    const snap = snapshotEffective();
+    const p = usageLogPath();
+    const size = fs.existsSync(p) ? fs.statSync(p).size : 0;
+    process.stdout.write(
+      `Tracking: ${snap.enabled ? 'ON' : 'OFF'} (source: ${snap.source})\n` +
+      `Mode:     ${snap.mode}\n` +
+      `Log:      ${p} (${size} bytes)\n`,
+    );
+  });
+
+usageCmd
+  .command('enable')
+  .description('Enable usage tracking')
+  .option('--verbose', 'Also record query/arg values (privacy trade-off)')
+  .action(async (opts: { verbose?: boolean }) => {
+    const { loadConfig, saveConfig } = await import('../usage/config');
+    const cfg = loadConfig();
+    cfg.usage.enabled = true;
+    if (opts.verbose) cfg.usage.mode = 'verbose';
+    saveConfig(cfg);
+    process.stdout.write(
+      `Usage tracking enabled (mode: ${cfg.usage.mode}).\n` +
+      'Note: running MCP server processes must be restarted to pick up the change.\n',
+    );
+  });
+
+usageCmd
+  .command('disable')
+  .description('Disable usage tracking (history preserved)')
+  .action(async () => {
+    const { loadConfig, saveConfig } = await import('../usage/config');
+    const cfg = loadConfig();
+    cfg.usage.enabled = false;
+    saveConfig(cfg);
+    process.stdout.write(
+      'Usage tracking disabled. History preserved at ~/.codegraph/usage.jsonl.\n' +
+      'Note: running MCP server processes must be restarted to pick up the change.\n',
+    );
+  });
+
+usageCmd
+  .command('clear')
+  .description('Truncate ~/.codegraph/usage.jsonl (history is lost)')
+  .option('-y, --yes', 'Skip confirmation prompt')
+  .action(async (opts: { yes?: boolean }) => {
+    const fs = await import('fs');
+    const { usageLogPath } = await import('../usage/paths');
+    const p = usageLogPath();
+    if (!fs.existsSync(p)) {
+      process.stdout.write('No usage log to clear.\n');
+      return;
+    }
+    if (!opts.yes) {
+      process.stderr.write('Refusing to clear without --yes. Pass --yes to confirm.\n');
+      process.exit(1);
+    }
+    fs.writeFileSync(p, '');
+    process.stdout.write(`Cleared ${p}.\n`);
+  });
+
+/**
  * codegraph install
  */
 program
