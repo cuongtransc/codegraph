@@ -126,13 +126,21 @@ export class MCPServer {
     this.transport.start(this.handleMessage.bind(this));
 
     // Keep the process running
-    process.on('SIGINT', () => this.stop());
-    process.on('SIGTERM', () => this.stop());
+    const onShutdown = (): void => {
+      this.stop().catch((err) => {
+        process.stderr.write(
+          `[CodeGraph MCP] Error during shutdown: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+        process.exit(1);
+      });
+    };
+    process.on('SIGINT', onShutdown);
+    process.on('SIGTERM', onShutdown);
 
     // When the parent process (Claude Code) exits, stdin closes.
     // Detect this and shut down gracefully to prevent orphaned processes.
-    process.stdin.on('end', () => this.stop());
-    process.stdin.on('close', () => this.stop());
+    process.stdin.on('end', onShutdown);
+    process.stdin.on('close', onShutdown);
   }
 
   /**
