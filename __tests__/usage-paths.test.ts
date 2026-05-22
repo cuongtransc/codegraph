@@ -28,6 +28,7 @@ describe('usage/paths', () => {
     process.env.CODEGRAPH_HOME = tmp;
     expect(usageDir()).toBe(tmp);
     expect(usageLogPath()).toBe(path.join(tmp, 'usage.jsonl'));
+    expect(configPath()).toBe(path.join(tmp, 'config.json'));
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 });
