@@ -44,6 +44,9 @@ and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.9.3] - 2026-05-22
 
 ### Added
+- `codegraph gain` shows per-tool and per-project usage from a local `~/.codegraph/usage.jsonl` log. Filters: `--since`, `--tool`, `--project`, `--project-exact`. JSON output via `--json`.
+- `codegraph usage` subcommand (enable/disable/status/clear) with a `--verbose` mode that opts into recording argument values, and a `CODEGRAPH_USAGE=0` env-var override.
+- Install flow now writes `~/.codegraph/config.json` and announces usage tracking in its output.
 - **Multi-account Claude Code support via `$CLAUDE_CONFIG_DIR`.** `codegraph
   install --target claude` now honors the same `$CLAUDE_CONFIG_DIR` env var
   Claude Code itself reads, so a second account at e.g. `~/.claude-work` gets

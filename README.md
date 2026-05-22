@@ -447,6 +447,34 @@ What that means in practice:
 > committed `dist/`. If you commit a dependency or build directory you don't want
 > in the graph, add it to `.gitignore`.
 
+
+## Usage Tracking
+
+Codegraph records one line per MCP tool call to `~/.codegraph/usage.jsonl` so you can see how much you actually use it. See it with:
+
+```bash
+codegraph gain
+```
+
+What's recorded (minimal mode, default):
+- timestamp, tool name, project path, duration, response byte count.
+
+What's **not** recorded by default: your queries, symbol names, or response content. To opt into recording arguments too:
+
+```bash
+codegraph usage enable --verbose
+```
+
+To turn tracking off entirely:
+
+```bash
+codegraph usage disable      # persistent
+CODEGRAPH_USAGE=0 ...        # one-process override
+```
+
+The log lives in a new global directory `~/.codegraph/` — distinct from the per-project `.codegraph/` index directory. Nothing in this subsystem ever sends data off your machine.
+
+`enable`/`disable` only takes effect for **new** MCP server processes. Restart your agent (Claude Code, Cursor, etc.) to pick up a change.
 ## Supported Languages
 
 | Language | Extension | Status |
