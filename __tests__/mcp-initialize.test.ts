@@ -16,6 +16,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { CodeGraph } from '../src';
+import { UsageRecorder } from '../src/usage/recorder';
+import { snapshotEffective } from '../src/usage/config';
+import { ToolHandler } from '../src/mcp/tools';
 
 const BIN = path.resolve(__dirname, '../dist/bin/codegraph.js');
 
@@ -118,6 +121,40 @@ describe('MCP initialize handshake (issue #172)', () => {
     expect(json.result.protocolVersion).toBeDefined();
     expect(json.result.capabilities.tools).toBeDefined();
   }, 10000);
+
+  it('smoke: tool call succeeds with CODEGRAPH_USAGE=1 and CODEGRAPH_HOME set (recorder does not break the call path)', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cg-mcp-rec-'));
+    const prevHome = process.env.CODEGRAPH_HOME;
+    const prevUsage = process.env.CODEGRAPH_USAGE;
+    process.env.CODEGRAPH_HOME = home;
+    process.env.CODEGRAPH_USAGE = '1';
+    try {
+      // snapshotEffective() reads CODEGRAPH_USAGE — this exercises the env-var
+      // branch (enabled=true via env) rather than hardcoding the config struct.
+      const config = snapshotEffective();
+      expect(config.enabled).toBe(true);
+      expect(config.source).toBe('env');
+
+      const handler = new ToolHandler(null);
+      const rec = new UsageRecorder(config, {
+        getDefaultProjectHint: () => handler.getDefaultProjectHint(),
+      });
+      const wrapped = rec.wrap(handler.execute.bind(handler));
+
+      // codegraph_status with no project returns an error result — not a throw.
+      // The key assertion is that the recorder doesn't break the content[] shape.
+      const result = await wrapped('codegraph_status', {});
+      expect(result).toHaveProperty('content');
+      expect(Array.isArray(result.content)).toBe(true);
+      expect(result.content.length).toBeGreaterThan(0);
+    } finally {
+      if (prevHome === undefined) delete process.env.CODEGRAPH_HOME;
+      else process.env.CODEGRAPH_HOME = prevHome;
+      if (prevUsage === undefined) delete process.env.CODEGRAPH_USAGE;
+      else process.env.CODEGRAPH_USAGE = prevUsage;
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
 
   it('sends initialize response BEFORE tryInitializeDefault finishes', async () => {
     // Seed a real .codegraph so the server's tryInitializeDefault path runs
