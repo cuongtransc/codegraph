@@ -50,12 +50,14 @@ export function parseSince(input: string): number {
 }
 
 export function aggregate(opts: AggregateOptions): Rollup {
+  // Validate --since up-front so malformed values reject even when no log file exists.
+  const sinceMs = opts.since ? parseSince(opts.since) : null;
+
   const path = usageLogPath();
   if (!fs.existsSync(path)) return emptyRollup();
 
   const lines = fs.readFileSync(path, 'utf8').split('\n').filter((l) => l.length > 0);
   const now = opts.now ?? new Date();
-  const sinceMs = opts.since ? parseSince(opts.since) : null;
   const cutoff = sinceMs !== null ? new Date(now.getTime() - sinceMs).toISOString() : null;
 
   const byTool = new Map<string, ToolRollup>();

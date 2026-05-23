@@ -12,7 +12,7 @@ export interface UsageConfigSnapshot {
   enabled: boolean;
   mode: 'minimal' | 'verbose';
   /** Where the `enabled` value came from. */
-  source: 'env' | 'config' | 'default';
+  source: 'env' | 'config';
 }
 
 const DEFAULT_CONFIG: UsageConfig = {

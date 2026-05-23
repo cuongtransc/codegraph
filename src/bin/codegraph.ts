@@ -1363,21 +1363,11 @@ program
     projectExact?: string;
     json?: boolean;
   }) => {
-    const { aggregate, parseSince } = await import('../usage/aggregator');
+    const { aggregate } = await import('../usage/aggregator');
     const { snapshotEffective } = await import('../usage/config');
     const { usageLogPath } = await import('../usage/paths');
     const { renderGain } = await import('../usage/render');
     const fs = await import('fs');
-
-    // Validate --since up front so we exit non-zero before any file I/O.
-    if (opts.since) {
-      try {
-        parseSince(opts.since);
-      } catch (e) {
-        process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`);
-        process.exit(1);
-      }
-    }
 
     let rollup;
     try {

@@ -54,9 +54,13 @@ export class UsageRecorder {
     };
   }
 
-  /** Wait for all queued background writes to complete. Used by tests and graceful shutdown. */
+  /**
+   * Wait for all currently-queued background writes to complete. Used by tests
+   * and graceful shutdown. Writes added AFTER this call started are not awaited —
+   * that's intentional for the shutdown case (caller stops accepting new work
+   * before invoking flush).
+   */
   async flush(): Promise<void> {
-    // Snapshot current in-flight writes; any added after this point are caller's problem.
     const inFlight = [...this.pending];
     await Promise.allSettled(inFlight);
   }

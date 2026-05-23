@@ -139,6 +139,17 @@ describe('UsageRecorder', () => {
     const rows = readRows(usageLogPath());
     expect(rows[0].project).toBe('/hint/path');
   });
+
+  it('survives a throwing hook and still returns the result', async () => {
+    const rec = new UsageRecorder(
+      { enabled: true, mode: 'minimal', source: 'config' },
+      { getDefaultProjectHint: () => { throw new Error('hook exploded'); } },
+    );
+    const wrapped = rec.wrap(async () => okResult);
+    const out = await wrapped('codegraph_status', {});
+    expect(out).toBe(okResult);
+    await rec.flush();
+  });
 });
 
 describe('UsageRecorder × ToolHandler', () => {
