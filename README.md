@@ -475,6 +475,7 @@ CODEGRAPH_USAGE=0 ...        # one-process override
 The log lives in a new global directory `~/.codegraph/` — distinct from the per-project `.codegraph/` index directory. Nothing in this subsystem ever sends data off your machine.
 
 `enable`/`disable` only takes effect for **new** MCP server processes. Restart your agent (Claude Code, Cursor, etc.) to pick up a change.
+
 ## Supported Languages
 
 | Language | Extension | Status |
@@ -511,6 +512,34 @@ The log lives in a new global directory `~/.codegraph/` — distinct from the pe
 
 - **You're on an old (pre-0.9) install.** Reinstall to get the bundled runtime — `curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh` (macOS/Linux), `irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | iex` (Windows), or `npm i -g @colbymchenry/codegraph@latest`.
 - **`codegraph status` shows `Journal:` other than `wal`** — WAL couldn't be enabled on this filesystem (common on network shares and WSL2 `/mnt`), so reads can block on writes. Move the project (with its `.codegraph/` folder) onto a local disk.
+
+**WASM fallback returns when switching Node versions (mise / nvm / asdf / volta)** — `better-sqlite3` ships a single native `.node` binary built for the Node ABI that installed it (the `NODE_MODULE_VERSION` baked into the binary). If you install codegraph globally under one Node version, then `cd` into a project where a version manager pins a different Node, `require('better-sqlite3')` throws `was compiled against a different Node.js version using NODE_MODULE_VERSION X. This version of Node.js requires NODE_MODULE_VERSION Y` and codegraph silently falls back to WASM. `npm rebuild better-sqlite3` only fixes one ABI at a time — the next project on a different Node breaks again. Pick the option that fits your workflow:
+
+  - **Install once per Node version** (cleanest when your version manager prepends the active Node to PATH, e.g. mise's `activate` shell hook):
+
+    ```bash
+    # Repeat for every Node version you actually use
+    mise exec node@20.20.2 -- npm install -g @colbymchenry/codegraph
+    mise exec node@22.22.0 -- npm install -g @colbymchenry/codegraph
+    mise exec node@24.14.0 -- npm install -g @colbymchenry/codegraph
+    # nvm equivalent: nvm use 20 && npm install -g @colbymchenry/codegraph
+    ```
+
+    Each install builds its own `better-sqlite3` matching that Node's ABI. The active Node's `codegraph` binary wins on PATH, so the right copy runs in each project.
+
+  - **Pin codegraph to one Node via a wrapper** (one file, no per-version reinstalls — best when you have many Node versions but want a single codegraph install). Use the helper script in this repo, which installs codegraph globally and then replaces the npm symlink with a bash wrapper that always invokes a known-good Node:
+
+    ```bash
+    # Run under whichever Node you want codegraph permanently pinned to.
+    curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/scripts/install-mise-safe.sh | bash
+
+    # Or from a clone:
+    ./scripts/install-mise-safe.sh
+    # Override the pinned Node explicitly:
+    PINNED_NODE=/Users/you/.nvm/versions/node/v22.14.0/bin/node ./scripts/install-mise-safe.sh
+    ```
+
+    Caveat: `npm install -g @colbymchenry/codegraph` (e.g. when upgrading) recreates the symlink and reintroduces the fallback — re-run the script after every upgrade.
 
 **MCP server not connecting** — Ensure the project is initialized/indexed, verify the path in your MCP config, and check that `codegraph serve --mcp` works from the command line.
 
