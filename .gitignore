@@ -53,3 +53,6 @@ test-languages/
 
 nul
 release/
+
+# Git worktrees (per global house rule: .worktrees/<branch>/)
+.worktrees/
