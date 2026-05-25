@@ -1,0 +1,61 @@
+min_version = "2024.12.0"
+
+[tools]
+node = "24"
+
+[tasks.deps]
+description = "Install npm dependencies"
+sources = ["package.json", "package-lock.json"]
+outputs = ["node_modules/.package-lock.json"]
+run = "npm install"
+
+[tasks.build]
+description = "Build TypeScript sources and copy SQL/wasm assets into dist/"
+depends = ["deps"]
+sources = ["src/**/*.ts", "src/db/schema.sql", "src/extraction/wasm/*.wasm", "tsconfig.json"]
+outputs = ["dist/bin/codegraph.js"]
+run = "npm run build"
+
+[tasks.dev]
+description = "tsc --watch"
+depends = ["deps"]
+run = "npm run dev"
+
+[tasks.test]
+description = "Run the full vitest suite"
+depends = ["deps"]
+run = "npm test"
+
+[tasks."test:watch"]
+description = "Vitest in watch mode"
+depends = ["deps"]
+run = "npm run test:watch"
+
+[tasks.eval]
+description = "Build, then run codegraph quality evaluation suite"
+depends = ["build"]
+run = "npm run eval"
+
+[tasks.cli]
+description = "Build then run the local dist binary"
+depends = ["build"]
+run = "node dist/bin/codegraph.js"
+
+[tasks.typecheck]
+description = "TypeScript type check without emit"
+depends = ["deps"]
+run = "npx tsc --noEmit"
+
+[tasks.clean]
+description = "Remove dist/"
+run = "npm run clean"
+
+[tasks.install]
+description = "Build and register this local codegraph build with installed agents (Claude Code, Cursor, Codex, opencode)"
+depends = ["build"]
+run = "node dist/bin/codegraph.js install"
+
+[tasks.uninstall]
+description = "Unregister codegraph from installed agents"
+depends = ["build"]
+run = "node dist/bin/codegraph.js uninstall"
